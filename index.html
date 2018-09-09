@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>拼图小游戏</title>
+    <meta charset="utf-8">
+    <link rel="stylesheet" type="text/css" href="css/style.css">
+</head>
+<body>
+<center>拼图小游戏</center>
+<div id="droptarget" class="droptarget">
+    <span>拖拽图片到这里</span>
+</div>
+<ul id="ul1">
+</ul>
+<div id="thumbimg" class="thumbimg">
+</div>
+<script src="js/EventUtil.js"></script>
+<script type="text/javascript" src="js/move.js"></script>
+<script>
+    window.onload = function () {
+        var droptarget = document.getElementById("droptarget"),
+            output = document.getElementById("ul1"),
+            thumbImg = document.getElementById("thumbimg");
+        aLi = [],
+            disX = 0,
+            disY = 0,
+            minZindex = 1,
+            aPos = [],
+            isEnd = false,
+            nodePos = [];
+
+        //刷新页面，保持数据
+        if (localStorage.getItem('nodePos') == null) {
+            function handleEvent(event) {
+                var info = "",
+                    reader = new FileReader(),
+                    files, i, len;
+
+                EventUtil.preventDefault(event);
+                localStorage.clear();
+
+                if (event.type == "drop") {
+                    files = event.dataTransfer.files;
+                    len = files.length;
+                    if (!/image/.test(files[0].type)) {
+                        alert('请上传图片类型的文件');
+                    }
+                    if (len > 1) {
+                        alert('上传图片数量不能大于1');
+                    }
+
+                    var canvas = document.createElement('canvas');
+                    var context = canvas.getContext('2d');
+                    var img = new Image(),          //原图
+                        thumbimg = new Image();     //等比缩放后的缩略图
+
+                    reader.readAsDataURL(files[0]);
+                    reader.onload = function (e) {
+                        img.src = e.target.result;
+                    }
+
+                    //图片对象加载完毕后，对图片进行等比缩放处理。缩放后最大宽度为三百像素
+                    img.onload = function () {
+                        var targetWidth, targetHeight;
+                        targetWidth = this.width > 300 ? 300 : this.width;
+                        targetHeight = targetWidth / this.width * this.height;
+                        canvas.width = targetWidth;
+                        canvas.height = targetHeight;
+                        context.clearRect(0, 0, targetWidth, targetHeight);
+                        context.drawImage(img, 0, 0, targetWidth, targetHeight);
+                        var tmpSrc = canvas.toDataURL("image/jpeg");
+                        //在本地存储完整的缩略图源
+                        localStorage.setItem('FullImage', tmpSrc);
+                        thumbimg.src = tmpSrc;
+                    }
+
+                    thumbimg.onload = function () {
+                        //每一个切片的宽高[切割成3*4格式]
+                        var sliceWidth, sliceHeight, sliceBase64, n = 0, outputElement = '',
+                            sliceWidth = this.width / 3,
+                            sliceHeight = this.height / 4,
+                            sliceElements = [];
+
+                        canvas.width = sliceWidth;
+                        canvas.height = sliceHeight;
+
+                        for (var j = 0; j < 4; j++) {
+                            for (var i = 0; i < 3; i++) {
+                                context.clearRect(0, 0, sliceWidth, sliceHeight);
+                                context.drawImage(thumbimg, sliceWidth * i, sliceHeight * j, sliceWidth, sliceHeight, 0, 0, sliceWidth, sliceHeight);
+                                sliceBase64 = canvas.toDataURL("image/jpeg");
+                                localStorage.setItem('slice' + n, sliceBase64);
+                                //为了防止图片三像素问题发生，请为图片属性添加 display:block
+                                newElement = "<li name=\"" + n + "\" style=\"margin:3px;\"><img src=\"" + sliceBase64 + "\" style=\"display:block;\"></li>";
+                                //根据随机数打乱图片顺序
+                                (Math.random() > 0.5) ? sliceElements.push(newElement) : sliceElements.unshift(newElement);
+                                n++;
+                            }
+                        }
+
+                        //拼接元素
+                        for (var k = 0, len = sliceElements.length; k < len; k++) {
+                            outputElement += sliceElements[k];
+                        }
+
+                        localStorage.setItem('imageWidth', this.width + 18);
+                        localStorage.setItem('imageHeight', this.height + 18);
+                        output.style.width = this.width + 18 + 'px';
+                        output.style.height = this.height + 18 + 'px';
+                        (output.innerHTML = outputElement) && beginGamesInit();
+
+                        droptarget.remove();
+                    }
+                }
+            }
+
+            EventUtil.addHandler(droptarget, "dragenter", handleEvent);
+            EventUtil.addHandler(droptarget, "dragover", handleEvent);
+            EventUtil.addHandler(droptarget, "drop", handleEvent);
+        } else {
+            output.innerHTML = '';
+            slicePos = localStorage.getItem('nodePos').split(",");
+            var outputElement = '';
+            for (var i = 0, len = slicePos.length; i < len; i++) {
+                SliceContent = localStorage.getItem('slice' + slicePos[i]);
+                outputElement += "<li name=\"" + slicePos[i] + "\" style=\"margin:3px;\"><img src=\"" + SliceContent + "\" style=\"display:block;\"></li>";
+            }
+            output.style.width = localStorage.getItem('imageWidth') + 'px';
+            output.style.height = localStorage.getItem('imageHeight') + 'px';
+            (output.innerHTML = outputElement) && beginGamesInit();
+
+            droptarget.remove();
+        }
+
+
+        //游戏开始初始化
+        function beginGamesInit() {
+            aLi = output.getElementsByTagName("li");
+            for (var i = 0; i < aLi.length; i++) {
+                var t = aLi[i].offsetTop;
+                var l = aLi[i].offsetLeft;
+                aLi[i].style.top = t + "px";
+                aLi[i].style.left = l + "px";
+                aPos[i] = {left: l, top: t};
+                aLi[i].index = i;
+                //将位置信息记录下来
+                nodePos.push(aLi[i].getAttribute('name'));
+            }
+            for (var i = 0; i < aLi.length; i++) {
+                aLi[i].style.position = "absolute";
+                aLi[i].style.margin = 0;
+                setDrag(aLi[i]);
+            }
+        }
+
+        //拖拽
+        function setDrag(obj) {
+            obj.onmouseover = function () {
+                obj.style.cursor = "move";
+                console.log(obj.index);
+            }
+
+            obj.onmousedown = function (event) {
+                var scrollTop = document.documentElement.scrollTop || document.body.scrollTop;
+                var scrollLeft = document.documentElement.scrollLeft || document.body.scrollLeft;
+                obj.style.zIndex = minZindex++;
+                //当鼠标按下时计算鼠标与拖拽对象的距离
+                disX = event.clientX + scrollLeft - obj.offsetLeft;
+                disY = event.clientY + scrollTop - obj.offsetTop;
+                document.onmousemove = function (event) {
+                    //当鼠标拖动时计算div的位置
+                    var l = event.clientX - disX + scrollLeft;
+                    var t = event.clientY - disY + scrollTop;
+                    obj.style.left = l + "px";
+                    obj.style.top = t + "px";
+
+                    for (var i = 0; i < aLi.length; i++) {
+                        aLi[i].className = "";
+                    }
+                    var oNear = findMin(obj);
+                    if (oNear) {
+                        oNear.className = "active";
+                    }
+                }
+
+                document.onmouseup = function () {
+                    document.onmousemove = null;       //当鼠标弹起时移出移动事件
+                    document.onmouseup = null;         //移出up事件，清空内存
+                    //检测是否普碰上，在交换位置
+                    var oNear = findMin(obj);
+                    if (oNear) {
+                        oNear.className = "";
+                        oNear.style.zIndex = minZindex++;
+                        obj.style.zIndex = minZindex++;
+
+                        startMove(oNear, aPos[obj.index]);
+                        startMove(obj, aPos[oNear.index], function () {
+                            gameIsEnd();
+                        });
+
+                        //交换index
+                        var t = oNear.index;
+                        oNear.index = obj.index;
+                        obj.index = t;
+
+                        //交换本次存储中的位置信息
+                        var tmp = nodePos[oNear.index];
+                        nodePos[oNear.index] = nodePos[obj.index];
+                        nodePos[obj.index] = tmp;
+                        localStorage.setItem('nodePos', nodePos);
+                    } else {
+                        startMove(obj, aPos[obj.index]);
+                    }
+                }
+                clearInterval(obj.timer);
+
+                return false;//低版本出现禁止符号
+            }
+        }
+
+        //碰撞检测
+        function colTest(obj1, obj2) {
+            var t1 = obj1.offsetTop;
+            var r1 = obj1.offsetWidth + obj1.offsetLeft;
+            var b1 = obj1.offsetHeight + obj1.offsetTop;
+            var l1 = obj1.offsetLeft;
+
+            var t2 = obj2.offsetTop;
+            var r2 = obj2.offsetWidth + obj2.offsetLeft;
+            var b2 = obj2.offsetHeight + obj2.offsetTop;
+            var l2 = obj2.offsetLeft;
+
+            if (t1 > b2 || r1 < l2 || b1 < t2 || l1 > r2) {
+                return false;
+            } else {
+                return true;
+            }
+        }
+
+        //勾股定理求距离(左上角的距离)
+        function getDis(obj1, obj2) {
+            var a = obj1.offsetLeft - obj2.offsetLeft;
+            var b = obj1.offsetTop - obj2.offsetTop;
+            return Math.sqrt(Math.pow(a, 2) + Math.pow(b, 2));
+        }
+
+        //找到距离最近的
+        function findMin(obj) {
+            var minDis = 999999999;
+            var minIndex = -1;
+            for (var i = 0; i < aLi.length; i++) {
+                if (obj == aLi[i]) continue;
+                if (colTest(obj, aLi[i])) {
+                    var dis = getDis(obj, aLi[i]);
+                    if (dis < minDis) {
+                        minDis = dis;
+                        minIndex = i;
+                    }
+                }
+            }
+            if (minIndex == -1) {
+                return null;
+            } else {
+                return aLi[minIndex];
+            }
+        }
+
+        //判断游戏是否结束
+        function gameIsEnd() {
+            for (var i = 0, len = aLi.length; i < len; i++) {
+                if (aLi[i].getAttribute('name') != aLi[i].index) {
+                    return false;
+                }
+            }
+
+            var finImage = new Image();
+            finImage.src = localStorage.getItem('FullImage');
+            output.innerHTML = "";
+            output.append(finImage);
+            localStorage.clear();
+        }
+    };
+</script>
+</body>
+</html>

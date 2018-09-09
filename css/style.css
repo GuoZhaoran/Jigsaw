@@ -1,0 +1,45 @@
+* {
+	padding: 0;
+	margin:0;
+	color:#333333;
+}
+
+center {
+	font-weight: normal;
+	margin:20px auto;
+	font-size: 22px;
+}
+
+.droptarget {
+	width: 400px; 
+	height: 200px;
+	background-color: #cccccc;
+	opacity: 0.7;
+	text-align: center;
+	margin:10px auto;
+}
+
+.droptarget span{
+	display: inline-block;
+	font-size: 18px;
+	margin-top: 80px;
+}
+
+#ul1 { 
+	position:relative; 
+	margin:30px auto;
+}
+
+#ul1 li {
+	 float:left; 
+	 list-style:none;
+}
+
+#ul1 li:hover{ 
+	border-color: #9a9fa4; 
+	box-shadow: 0 0 6px 0 rgba(0, 0, 0, 0.85);
+}
+
+#ul1 .active{
+ border:1px dashed red;
+}
